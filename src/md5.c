@@ -38,6 +38,13 @@
 #ifndef HAVE_OPENSSL
 
 #include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 #include "md5.h"
 
@@ -294,3 +301,48 @@ void MD5_Final(unsigned char *result, MD5_CTX *ctx)
 }
 
 #endif
+
+#define BUFSIZE 4096
+int md5sum_fd(int fd, unsigned char * digest)
+{
+	char * buf;
+	int ret;
+	MD5_CTX ctx;
+
+	if (fd < 0 || !digest)
+		return -EINVAL;
+
+	buf = malloc(BUFSIZE);
+	if (!buf)
+		return -ENOMEM;
+
+	MD5_Init(&ctx);
+
+	while ( (ret = read(fd, buf, BUFSIZE)) > 0 ) {
+		MD5_Update(&ctx, buf, ret);
+	}
+
+	free(buf);
+
+	MD5_Final(digest, &ctx);
+
+	return 0;
+}
+
+int md5sum_path(const char * path, unsigned char * digest)
+{
+	int fd, ret = 0;
+
+	if (!path || !digest)
+		return -EINVAL;
+
+	fd = open(path,O_RDONLY);
+	if (fd >= 0) {
+		ret = md5sum_fd(fd, digest);
+		close(fd);
+	} else {
+		perror("open");
+		ret = -1;
+	}
+	return ret;
+}

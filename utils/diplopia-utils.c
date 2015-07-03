@@ -13,7 +13,7 @@ int main (int argc, char **argv)
 		return -EINVAL;
 	}
 
-	if (argc >2)
+	if (argc > 2)
 		option = atoi(argv[2]);
 
 	printf("Parsing %s\n", argv[1]);

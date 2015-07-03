@@ -42,4 +42,7 @@ extern void MD5_Init(MD5_CTX *ctx);
 extern void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size);
 extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
 
+extern int md5sum_fd(int fd, unsigned char * digest);
+extern int md5sum_path(const char * path, unsigned char * digest);
+
 #endif

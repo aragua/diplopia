@@ -25,56 +25,31 @@ int is_regular(const char *path)
 	return S_ISREG(path_stat.st_mode);
 }
 
+
+static int remove_directory_callback(const char * path, struct stat * statbuf)
+{
+	if (S_ISDIR(statbuf->st_mode)) {
+		if (rmdir(path) != 0)
+			perror("rmdir");
+	} else {
+		if (unlink(path) != 0)
+			perror("unlink");
+	}
+	return 0;
+}
+
 int remove_directory(const char *path)
 {
-	DIR *d;
-	size_t path_len;
-	int r = -1;
-
-	if (!path)
-		return -1;
-
-	d = opendir(path);
-	path_len = strlen(path);
-
-	if (d) {
-		struct dirent *p;
-		r = 0;
-
-		while (!r && (p=readdir(d))) {
-			int r2 = -1;
-			char *buf;
-			size_t len;
-
-			/* Skip . and .. to avoid to recurse on them. */
-			if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
-				continue;
-
-			len = path_len + strlen(p->d_name) + 2;
-			buf = malloc(len);
-
-			if (buf) {
-				struct stat statbuf;
-				snprintf(buf, len, "%s/%s", path, p->d_name);
-				if (!stat(buf, &statbuf)) {
-					if (S_ISDIR(statbuf.st_mode)) {
-						r2 = remove_directory(buf);
-					} else {
-						r2 = unlink(buf);
-					}
-				}
-				free(buf);
-			}
-			r = r2;
-		}
-		closedir(d);
+	if (!path || !is_directory(path)) {
+		fprintf(stderr, "Error: %s is not a diretory\n", path);
+		return -EINVAL;
 	}
 
-	if (!r) {
-		r = rmdir(path);
-	}
+	parse_directory(path, OPT_RECURSIVE|OPT_NODOTANDDOTDOT|OPT_PARSEDIRBEFORE,remove_directory_callback);
 
-	return r;
+	rmdir(path);
+
+	return 0;
 }
 
 int parse_directory(const char *path, int option, int (*callback)(const char*, struct stat*))
@@ -113,16 +88,19 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 				if (len > PATH_MAX)
 					continue;
 
-				snprintf(buf, len, "%s/%s", path, p->d_name);
+				if (path[path_len-1] == '/')
+					snprintf(buf, len, "%s%s", path, p->d_name);
+				else
+					snprintf(buf, len, "%s/%s", path, p->d_name);
 				if (!stat(buf, &statbuf)) {
-					if (option&OPT_PARSEDIRBEFORE)
+					if (!(option&OPT_PARSEDIRBEFORE))
 						callback(buf,&statbuf);
 					if (!isdot &&
 						(option&OPT_RECURSIVE) &&
 						S_ISDIR(statbuf.st_mode)) {
 						parse_directory(buf, option, callback);
 					}
-					if (!(option&OPT_PARSEDIRBEFORE))
+					if (option&OPT_PARSEDIRBEFORE)
 						callback(buf,&statbuf);
 				}
 			}
