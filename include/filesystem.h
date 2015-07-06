@@ -14,5 +14,6 @@ int parse_directory(const char *path, int recursive, int (*callback)(const char*
 #define OPT_RECURSIVE 1<<0
 #define OPT_NODOTANDDOTDOT 1<<1
 #define OPT_PARSEDIRBEFORE 1<<2
+#define OPT_FOLLOWSYMLINK 1<<3
 
 #endif

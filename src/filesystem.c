@@ -56,12 +56,18 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 {
 	DIR *d;
 	size_t path_len;
+	int (*statfn)(const char *pathname, struct stat *buf);
 
 	if (!path)
 		return -1;
 
 	d = opendir(path);
 	path_len = strlen(path);
+
+	if (option&OPT_FOLLOWSYMLINK)
+	  statfn = stat;
+	else
+	  statfn = lstat;
 
 	if (d) {
 		struct dirent *p;
@@ -92,9 +98,9 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 					snprintf(buf, len, "%s%s", path, p->d_name);
 				else
 					snprintf(buf, len, "%s/%s", path, p->d_name);
-				if (!stat(buf, &statbuf)) {
+				if (!statfn(buf, &statbuf)) {
 					if (!(option&OPT_PARSEDIRBEFORE))
-						callback(buf,&statbuf);
+					  callback(buf,&statbuf);
 					if (!isdot &&
 						(option&OPT_RECURSIVE) &&
 						S_ISDIR(statbuf.st_mode)) {
