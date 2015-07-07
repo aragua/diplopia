@@ -7,26 +7,27 @@
 #include <filesystem.h>
 #include <md5.h>
 
+#include <list.h>
+
 #define OUTPUT "/tmp/doublons/"
 
-/* Manage list of files with the same md5 */
-struct digest_entry {
-	struct digest_entry * previous;
-	struct digest_entry * next;
-	char *path;
-	void *parent;
-};
-
-struct digest_list {
+struct digest {
 	unsigned char digest[16];
-	int entry_nbr;
-	struct digest_entry *first;
-	struct digest_entry *last;
+	struct list * paths;
 };
 
-/*
-memcpy(list->digest, digest, 16*sizeof(unsigned char));
-*/
+static struct list * digest_list;
+
+static int digest_init(struct digest *new, unsigned char * digest)
+{
+	if (!new || !digest)
+		return -EINVAL;
+	memcpy(new->digest, digest, 16*sizeof(unsigned char));
+	new->paths = list_new();
+	if (!new->paths)
+		return -ENOMEM;
+	return 0;
+}
 
 /* Callback to treat all files */
 static int printmd5(const char *path, struct stat *statbuf)
@@ -38,7 +39,6 @@ static int printmd5(const char *path, struct stat *statbuf)
 	else {
 		unsigned char digest[16];
 		char *out = (char *)malloc(33);
-
 		int n;
 		md5sum_path(path, digest);
 		for (n = 0; n < 16; ++n) {
@@ -63,7 +63,15 @@ int search_duplicate(const char *path, int option)
 	//remove_directory(OUTPUT);
 	//mkdir(OUTPUT,0644);
 
+	digest_list = list_new();
+	if (!digest_list)
+		return -ENOMEM;
+
 	parse_directory(path, OPT_RECURSIVE | OPT_NODOTANDDOTDOT, printmd5);
 
+	
+	
+	list_free(digest_list);
+	
 	return dup;
 }
