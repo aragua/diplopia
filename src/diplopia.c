@@ -10,21 +10,26 @@
 #define OUTPUT "/tmp/doublons/"
 
 /* Manage list of files with the same md5 */
-struct dup_list_entry {
-  char * path;
-  void * parent;
-}
-  
-struct dup_list {
-  struct dup_list * next;
-  unsigned char digest[16];
-  int entry_nbr;
-  struct dup_list_entry * first;
-}
+struct digest_entry {
+	struct digest_entry * previous;
+	struct digest_entry * next;
+	char *path;
+	void *parent;
+};
 
-  
+struct digest_list {
+	unsigned char digest[16];
+	int entry_nbr;
+	struct digest_entry *first;
+	struct digest_entry *last;
+};
+
+/*
+memcpy(list->digest, digest, 16*sizeof(unsigned char));
+*/
+
 /* Callback to treat all files */
-static int printmd5(const char * path, struct stat * statbuf)
+static int printmd5(const char *path, struct stat *statbuf)
 {
 	if (S_ISDIR(statbuf->st_mode))
 		printf("\033[0;32;40mEntering %s\033[0m\n", path);
@@ -32,12 +37,13 @@ static int printmd5(const char * path, struct stat * statbuf)
 		printf("\033[0;33;40m%s is a link\033[0m\n", path);
 	else {
 		unsigned char digest[16];
-		char *out = (char*)malloc(33);
+		char *out = (char *)malloc(33);
 
 		int n;
 		md5sum_path(path, digest);
 		for (n = 0; n < 16; ++n) {
-			snprintf(&(out[n*2]), 16*2, "%02x", (unsigned int)digest[n]);
+			snprintf(&(out[n * 2]), 16 * 2, "%02x",
+				 (unsigned int)digest[n]);
 		}
 		printf("%s : %s\n", out, path);
 		free(out);
@@ -46,7 +52,7 @@ static int printmd5(const char * path, struct stat * statbuf)
 }
 
 /* Main function */
-int search_duplicate(const char * path, int option)
+int search_duplicate(const char *path, int option)
 {
 	int dup = 0;
 
@@ -57,7 +63,7 @@ int search_duplicate(const char * path, int option)
 	//remove_directory(OUTPUT);
 	//mkdir(OUTPUT,0644);
 
-	parse_directory(path,OPT_RECURSIVE|OPT_NODOTANDDOTDOT,printmd5);
+	parse_directory(path, OPT_RECURSIVE | OPT_NODOTANDDOTDOT, printmd5);
 
 	return dup;
 }

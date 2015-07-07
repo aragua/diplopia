@@ -38,6 +38,11 @@ add_executable(
   )
 
 add_executable(
+  list-test
+  test/list_test.c include/list.h
+  )
+
+add_executable(
   diplopia-utils
   utils/diplopia-utils.c
   )
