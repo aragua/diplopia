@@ -1,7 +1,30 @@
+/*
+  Copyright (c) 2015 Fabien Lahoudere
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+*/
+		
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <diplopia.h>
 #include <filesystem.h>
@@ -72,11 +95,11 @@ static int add_new_path(const char * path, unsigned char * dgst)
 static int printmd5(const char *path, struct stat *statbuf)
 {
 	if (S_ISDIR(statbuf->st_mode)) {
-		printf("\rParsing %s                                  ", path); // Fix: replace space
+		printf("\rParsing %s", path);
 		fflush(stdout);
 	}
 	else if (S_ISLNK(statbuf->st_mode)) {
-		printf("\r%s is a link                                ", path); // Fix: replace space
+		printf("\r%s is a link", path);
 		fflush(stdout);
 	}
 	else {
@@ -87,7 +110,12 @@ static int printmd5(const char *path, struct stat *statbuf)
 	return 0;
 }
 
-/* Main function */
+/* flags are related to flags defined in filesystem.h */
+#define RECURSIVE 1<<0
+#define NOHIDDENFILE 1<<4
+#define NOHIDDENFOLDER 1<<5
+#define SHOWSINGLE 1<<6
+
 int search_duplicate(const char *path, int option)
 {
 	int dup = 0;
@@ -98,17 +126,11 @@ int search_duplicate(const char *path, int option)
 		fprintf(stderr, "Error: %s is not a diretory\n", path);
 		return -EINVAL;
 	}
-	//remove_directory(OUTPUT);
-	//mkdir(OUTPUT,0644);
-
 	digest_list = list_new();
 	if (!digest_list)
 		return -ENOMEM;
-
-	parse_directory(path, option, printmd5);
-
-	printf("\n");
-
+	parse_directory(path, OPT_NODOTANDDOTDOT|option, printmd5);
+	printf("\r");
 	out = malloc(33);
 	if (out) {
 		list_for_each(digest_list,el) {
@@ -119,12 +141,16 @@ int search_duplicate(const char *path, int option)
 				snprintf(&(out[n * 2]), 16 * 2, "%02x",
 					 (unsigned int)d->digest[n]);
 			}
-			if (d->paths->count == 1)
-				printf("\033[0;32;40m%s :\033[0m\n", out);
-			else
+			if (d->paths->count == 1) {
+				if (option&SHOWSINGLE)
+					printf("\033[0;32;40m%s\033[0m : %s\n",
+					       out,
+					       (char*)(d->paths->first->data));
+			} else {
 				printf("\033[0;31;40m%s :\033[0m\n", out);
-			list_for_each(d->paths,ed) {
-				printf("\t%s\n", (char*)ed->data);
+				list_for_each(d->paths,ed) {
+					printf("\t%s\n", (char*)ed->data);
+				}
 			}
 		}
 		free(out);
@@ -136,22 +162,42 @@ int search_duplicate(const char *path, int option)
 }
 
 
+void Usage(void)
+{
+	fprintf(stderr, "diplopia [options] <folder path>\n");
+	fprintf(stderr, "\noptions:\n");
+	fprintf(stderr, "\t-d : Do not parse dot prefixed directories\n");
+	fprintf(stderr, "\t-f : Do not treat dot prefixed files\n");
+	fprintf(stderr, "\t-r : Do not parse recursively\n");
+	fprintf(stderr, "\t-s : Show single file\n");
+}
+
 int main (int argc, char **argv)
 {
-	int option = OPT_RECURSIVE | OPT_NODOTANDDOTDOT;
-
-	if (argc < 2) {
-		fprintf(stderr, "Error: need a folder path to parse\n");
+	int opt, option = RECURSIVE;
+	while ((opt = getopt(argc, argv, "dfrs")) != -1) {
+	    switch (opt) {
+	    case 'd':
+		    option |= NOHIDDENFOLDER;
+		    break;
+	    case 'f':
+		    option |= NOHIDDENFILE;
+		    break;
+	    case 'r':
+		    option &= ~RECURSIVE;
+		    break;
+	    case 's':
+		    option |= SHOWSINGLE;
+		    break;
+	    default:
+		    Usage();
+		    exit(1);
+	    }
+	}
+	if ((argc - optind) != 1) {
+		Usage();
 		return -EINVAL;
 	}
-
-	if (argc > 2)
-		option = atoi(argv[2]);
-
-	printf("Parsing %s\n", argv[1]);
-
-	search_duplicate(argv[1],option);
-
-	return 0;
+	return search_duplicate(argv[optind],option);
 }
 
