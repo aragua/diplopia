@@ -5,6 +5,7 @@ none
 
 ## Compile
 cmake CMakeList.txt
+
 make
 
 ## Run
