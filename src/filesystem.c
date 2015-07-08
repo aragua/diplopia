@@ -90,6 +90,11 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 						continue;
 				}
 
+				/* Skip hidden folder from recursion */
+				if ((option&OPT_NOHIDDENFILE) &&
+				    (p->d_name[0] == '.'))
+					continue;
+
 				len = path_len + strlen(p->d_name) + 2;
 				if (len > PATH_MAX)
 					continue;
@@ -104,7 +109,12 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 					if (!isdot &&
 						(option&OPT_RECURSIVE) &&
 						S_ISDIR(statbuf.st_mode)) {
-						parse_directory(buf, option, callback);
+						/* Skip hidden folder from recursion */
+						if ((option&OPT_NOHIDDENFOLDER) &&
+							(p->d_name[0] == '.'))
+							continue;
+						else
+							parse_directory(buf, option, callback);
 					}
 					if (option&OPT_PARSEDIRBEFORE)
 						callback(buf,&statbuf);

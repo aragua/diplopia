@@ -5,7 +5,7 @@
 int main (int argc, char ** argv)
 {
 	struct list * l;
-	struct list_entry * e,*n;
+	struct list_entry * e;
 
 	l = list_new();
 	if (l) {
@@ -13,7 +13,7 @@ int main (int argc, char ** argv)
 		list_add_last(l,"je m'appelle");
 		list_add_last(l,"Fabien");
 
-		list_for_each(l,e,n) {
+		list_for_each(l,e) {
 			printf("%s ", (char *)(e->data));
 		}
 		printf("\n");

@@ -12,9 +12,13 @@ struct list_entry {
 
 struct list {
 	int count;
+	int options;
 	struct list_entry *first;
 	struct list_entry *last;
 };
+
+#define LIST_OPT_MUTEX 1<<0
+#define LIST_OPT_FREE_DATA 1<<1
 
 static inline struct list_entry * list_entry_new(void * d)
 {
@@ -41,6 +45,7 @@ static inline struct list * list_new(void)
 	l = malloc(sizeof(struct list));
 	if (l) {
 		l->count = 0;
+		l->options = 0;
 		l->first = NULL;
 		l->last = NULL;
 	}
@@ -112,8 +117,22 @@ static inline int list_add(struct list * l, void * d)
 	return list_add_first(l, d);
 }
 
-#define list_for_each(l,e,n)				\
+#define list_for_each(l,e)				\
+	for (e = l->first; e ; e = e->next)
+
+#define list_for_each_safe(l,e,n)				\
 	for (e = l->first; e && ({ n=e->next; 1;}); e = n)
+
+static inline void list_clean_data(struct list * l, void(*clean_cb)(void *))
+{
+	if (l) {
+		struct list_entry * e, * n;
+		list_for_each_safe(l,e,n) {
+			clean_cb(e->data);
+			e->data = NULL;
+		}
+	}
+}
 
 static inline int list_rm_first(struct list * l)
 {
@@ -123,6 +142,8 @@ static inline int list_rm_first(struct list * l)
 	if (l->first) {
 		entry = l->first;
 		l->first = entry->next;
+		if (l->options&LIST_OPT_FREE_DATA)
+			free(entry->data);
 		free(entry);
 		if (l->first)
 			l->first->previous = NULL;
@@ -139,6 +160,8 @@ static inline int list_rm_last(struct list * l)
 	if (l->last) {
 		entry = l->last;
 		l->last = entry->previous;
+		if (l->options&LIST_OPT_FREE_DATA)
+			free(entry->data);
 		free(entry);
 		if (l->last)
 			l->last->next = NULL;
@@ -151,7 +174,7 @@ static inline void list_free(struct list * l)
 {
 	if (l) {
 		struct list_entry * e, * n;
-		list_for_each(l,e,n)
+		list_for_each_safe(l,e,n)
 			list_rm_first(l);
 		free(l);
 	}
