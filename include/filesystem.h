@@ -32,6 +32,7 @@ int is_directory(const char *path);
 int is_regular(const char *path);
 int remove_directory(const char *path);
 int parse_directory(const char *path, int recursive, int (*callback)(const char*, struct stat*));
+int cp(const char * src, const char * dst);
 
 #define OPT_RECURSIVE 1<<0
 #define OPT_NODOTANDDOTDOT 1<<1

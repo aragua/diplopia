@@ -25,6 +25,9 @@
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <filesystem.h>
 
@@ -46,7 +49,6 @@ int is_regular(const char *path)
 	stat(path, &path_stat);
 	return S_ISREG(path_stat.st_mode);
 }
-
 
 static int remove_directory_callback(const char * path, struct stat * statbuf)
 {
@@ -123,7 +125,7 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 					snprintf(buf, len, "%s%s", path, p->d_name);
 				else
 					snprintf(buf, len, "%s/%s", path, p->d_name);
-				if (!statfn(buf, &statbuf)) {
+				if (statfn(buf, &statbuf) == 0) {
 					if (!(option&OPT_PARSEDIRBEFORE))
 					  callback(buf,&statbuf);
 					if (!isdot &&
@@ -147,3 +149,44 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 	return 0;
 }
 
+int cp(const char * src, const char * dst)
+{
+	if (!src || !dst)
+		return -EINVAL;
+
+	if( access(dst, F_OK) != -1 ) {
+		fprintf(stderr, "File exists!!!\n");
+	} else {
+		int fdout, fdin;
+		struct stat statbuf;
+
+		fdout = open(dst,O_WRONLY);
+		if (fdout > 0) {
+			fdin = open(src, O_RDONLY);
+			if (fdin > 0) {
+				if (fstat(fdin, &statbuf) == 0) {
+					off_t sz = statbuf.st_size;
+					unsigned char * buf = malloc(4096);
+					if (buf) {
+						while (sz > 0) {
+							int ret = 0;
+							ret = read(fdin, buf, 4096);
+							sz -= ret;
+							ret = write(fdout, buf, ret);
+							if ( ret < 0 ) {
+								fprintf(stderr, "cp fails during transfer\n");
+								break;
+							}
+						}
+					}
+				}
+				close(fdin);
+			}
+			close(fdout);
+		} else {
+			return fdout;  
+		}
+	}
+	
+	return -1;
+}
