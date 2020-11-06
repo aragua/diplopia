@@ -26,14 +26,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <diplopia.h>
-#include <filesystem.h>
-#include <md5.h>
-
-#include <list.h>
-
-/* Define the list of digest and paths */
-static struct list * digest_list;
+#include "diplopia.h"
+#include "filesystem.h"
+#include "md5.h"
 
 /* Define the structure where paths with same md5 are stored */ 
 struct digest {
@@ -61,7 +56,7 @@ static void digest_free(struct digest *d)
 	}
 }
 
-static int add_new_path(const char * path, unsigned char * dgst)
+static int add_new_path(const char * path, unsigned char * dgst, struct list * digest_list)
 {
 	struct list_entry * e;
 	struct digest *new;
@@ -69,10 +64,12 @@ static int add_new_path(const char * path, unsigned char * dgst)
 		return -EINVAL;
 
 	/* check if the digest already exists ...*/
-	list_for_each(digest_list,e) {
+	list_for_each(digest_list,e)
+	{
 		struct digest * d = (struct digest *)(e->data);
 		/* ... If yes we add the new path */
-		if (memcmp(d->digest, dgst, 16)==0) {
+		if (memcmp(d->digest, dgst, 16)==0)
+		{
 			list_add(d->paths, strdup(path));
 			return 0;
 		}
@@ -81,33 +78,44 @@ static int add_new_path(const char * path, unsigned char * dgst)
 	/* ... If not we create a new instance with the digest */
 	new = malloc(sizeof(struct digest));
 	if (new) {
-		if (digest_init(new, dgst)==0) {
+		if (digest_init(new, dgst)==0)
+		{
 			list_add(new->paths, strdup(path));
 			list_add(digest_list,new);
 			return 0;
 		} else
 			free(new);
 	}
-       	return -1;
+
+   	return -1;
 }
 
 /* Callback to treat all files */
-static int printmd5(const char *path, struct stat *statbuf)
+static int printmd5(const char *path, struct stat *statbuf, void *data)
 {
-	if (S_ISDIR(statbuf->st_mode)) {
+	struct list * digest_list = (struct list *)data;
+
+	if (!path || !statbuf || !digest_list)
+		return EXIT_FAILURE;
+
+	if (S_ISDIR(statbuf->st_mode))
+	{
 		printf("\rParsing %s", path);
 		fflush(stdout);
 	}
-	else if (S_ISLNK(statbuf->st_mode)) {
+	else if (S_ISLNK(statbuf->st_mode))
+	{
 		printf("\r%s is a link", path);
 		fflush(stdout);
 	}
-	else {
+	else
+	{
 		unsigned char digest[16];
 		md5sum_path(path, digest);
-		add_new_path(path,digest);
+		add_new_path(path, digest, digest_list);
 	}
-	return 0;
+
+	return EXIT_SUCCESS;
 }
 
 /* flags are related to flags defined in filesystem.h */
@@ -116,31 +124,39 @@ static int printmd5(const char *path, struct stat *statbuf)
 #define NOHIDDENFOLDER 1<<5
 #define SHOWSINGLE 1<<6
 
-int search_duplicate(const char *path, int option)
+int search_duplicate(struct list * paths, int option)
 {
 	int dup = 0;
-	struct list_entry *el;
+	struct list_entry *el, *p;
 	char * out;
+	/* Define the list of digest and paths */
+	struct list * digest_list;
 
-	if (!path || !is_directory(path)) {
-		fprintf(stderr, "Error: %s is not a diretory\n", path);
+	if (!paths)
 		return -EINVAL;
-	}
+
 	digest_list = list_new();
 	if (!digest_list)
 		return -ENOMEM;
-	parse_directory(path, OPT_NODOTANDDOTDOT|option, printmd5);
+
+	list_for_each(paths, p)
+	{
+		if (p && is_directory((char *)p->data))
+			parse_directory((char *)p->data, OPT_NODOTANDDOTDOT|option, printmd5, digest_list);
+	}
 	printf("\r");
+
 	out = malloc(33);
-	if (out) {
+	if (out)
+	{
 		list_for_each(digest_list,el) {
 			struct list_entry *ed;
 			struct digest * d = el->data;
 			int n;
-			for (n = 0; n < 16; ++n) {
-				snprintf(&(out[n * 2]), 16 * 2, "%02x",
-					 (unsigned int)d->digest[n]);
-			}
+
+			for (n = 0; n < 16; ++n)
+				snprintf(&(out[n * 2]), 16 * 2, "%02x", (unsigned int)d->digest[n]);
+
 			if (d->paths->count == 1) {
 				if (option&SHOWSINGLE)
 					printf("\033[0;32;40m%s\033[0m : %s\n",
@@ -174,7 +190,9 @@ void Usage(void)
 
 int main (int argc, char **argv)
 {
-	int opt, option = RECURSIVE;
+	int opt, option = RECURSIVE, ret = EXIT_FAILURE;
+	struct list * paths;
+
 	while ((opt = getopt(argc, argv, "dfrs")) != -1) {
 	    switch (opt) {
 	    case 'd':
@@ -194,10 +212,17 @@ int main (int argc, char **argv)
 		    exit(1);
 	    }
 	}
-	if ((argc - optind) != 1) {
+	if ((argc - optind) < 1) {
 		Usage();
 		return -EINVAL;
 	}
-	return search_duplicate(argv[optind],option);
+	
+	paths = list_new();
+	for (size_t idx = optind; idx < argc; idx++) {
+		list_add(paths, argv[optind]);
+	}
+	ret = search_duplicate(paths,option);
+
+	return ret;
 }
 

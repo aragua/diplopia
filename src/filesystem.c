@@ -50,7 +50,7 @@ int is_regular(const char *path)
 	return S_ISREG(path_stat.st_mode);
 }
 
-static int remove_directory_callback(const char * path, struct stat * statbuf)
+static int remove_directory_callback(const char * path, struct stat * statbuf, void * data)
 {
 	if (S_ISDIR(statbuf->st_mode)) {
 		if (rmdir(path) != 0)
@@ -70,12 +70,12 @@ int remove_directory(const char *path)
 	}
 	parse_directory(path,
 			OPT_RECURSIVE|OPT_NODOTANDDOTDOT|OPT_PARSEDIRBEFORE,
-			remove_directory_callback);
+			remove_directory_callback, NULL);
 	rmdir(path);
 	return 0;
 }
 
-int parse_directory(const char *path, int option, int (*callback)(const char*, struct stat*))
+int parse_directory(const char *path, int option, int (*callback)(const char*, struct stat*, void *), void * data)
 {
 	DIR *d;
 	size_t path_len;
@@ -106,8 +106,8 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 				struct stat statbuf;
 
 				/* Skip . and .. to avoid to recurse on them. */
-				if (!strcmp(p->d_name, ".") ||
-					!strcmp(p->d_name, "..")) {
+				if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+				{
 					isdot=1;
 					if (option&OPT_NODOTANDDOTDOT)
 						continue;
@@ -125,21 +125,22 @@ int parse_directory(const char *path, int option, int (*callback)(const char*, s
 					snprintf(buf, len, "%s%s", path, p->d_name);
 				else
 					snprintf(buf, len, "%s/%s", path, p->d_name);
-				if (statfn(buf, &statbuf) == 0) {
+
+				if (statfn(buf, &statbuf) == 0)
+				{
 					if (!(option&OPT_PARSEDIRBEFORE))
-					  callback(buf,&statbuf);
-					if (!isdot &&
-						(option&OPT_RECURSIVE) &&
-						S_ISDIR(statbuf.st_mode)) {
+						callback(buf, &statbuf, data);
+
+					if (!isdot && (option&OPT_RECURSIVE) &&	S_ISDIR(statbuf.st_mode))
+					{
 						/* Skip hidden folder from recursion */
-						if ((option&OPT_NOHIDDENFOLDER) &&
-							(p->d_name[0] == '.'))
+						if ((option&OPT_NOHIDDENFOLDER) && (p->d_name[0] == '.'))
 							continue;
 						else
-							parse_directory(buf, option, callback);
+							parse_directory(buf, option, callback, data);
 					}
 					if (option&OPT_PARSEDIRBEFORE)
-						callback(buf,&statbuf);
+						callback(buf, &statbuf, data);
 				}
 			}
 			free(buf);

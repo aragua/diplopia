@@ -1,6 +1,8 @@
 #ifndef DIPLOPIA_H
 #define DIPLOPIA_H
 
-int search_duplicate(const char * path, int option);
+#include "list.h"
+
+int search_duplicate(struct list * paths, int option);
 
 #endif

@@ -334,7 +334,7 @@ int md5sum_fd(int fd, unsigned char * digest)
 
 int md5sum_path(const char * path, unsigned char * digest)
 {
-	int fd, ret = 0;
+	int fd, ret = EXIT_SUCCESS;
 
 	if (!path || !digest)
 		return -EINVAL;
@@ -345,7 +345,7 @@ int md5sum_path(const char * path, unsigned char * digest)
 		close(fd);
 	} else {
 		perror("open");
-		ret = -1;
+		ret = EXIT_FAILURE;
 	}
 	return ret;
 }
