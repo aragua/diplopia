@@ -223,6 +223,8 @@ int main (int argc, char **argv)
 	}
 	ret = search_duplicate(paths,option);
 
+	list_free(paths);
+	
 	return ret;
 }
 
