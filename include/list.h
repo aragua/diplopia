@@ -128,7 +128,7 @@ static inline int list_add_last(struct list * l, void * d)
 	e = list_entry_new(d);
 	if (!e)
 		return -ENOMEM;
-		ret = list_insert_last(l,e);
+	ret = list_insert_last(l,e);
 	if (ret < 0)
 		free(e);
 	return ret;
